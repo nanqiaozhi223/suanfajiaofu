@@ -83,11 +83,13 @@
     .sidebar-tab[aria-current="page"] { border-color: color-mix(in srgb, var(--accent) 32%, var(--surface)); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
     .app-main { min-width: 0; flex: 1; }
     .record-tabs { display: flex; align-items: flex-end; gap: 28px; margin: -4px 0 22px; border-bottom: 1px solid var(--border); overflow-x: auto; }
-    .record-tab { position: relative; flex: 0 0 auto; padding: 0 0 12px; border: 0; background: transparent; color: var(--muted); font-size: 16px; font-weight: 500; white-space: nowrap; }
+    .record-tab { position: relative; display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; padding: 0 0 12px; border: 0; background: transparent; color: var(--muted); font-size: 16px; font-weight: 500; white-space: nowrap; }
     .record-tab:hover { color: var(--fg); }
     .record-tab[aria-selected="true"] { color: var(--accent); font-weight: 650; }
     .record-tab[aria-selected="true"]::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; background: var(--accent); content: ""; }
-    .record-tab-count { display: inline-grid; min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; place-items: center; border-radius: 999px; background: #ef4444; color: #fff; font-size: 10px; line-height: 1; vertical-align: middle; }
+    .record-tab-count { display: inline-grid; min-width: 18px; height: 18px; margin: 0; padding: 0 5px; place-items: center; align-self: center; border-radius: 999px; background: #e6f0ff; color: #2f6feb; font-size: 12px; font-weight: 600; line-height: 18px; }
+    .record-tab, .pending-subtab { align-items: center; }
+    #reviewCount, #scanReviewCount, #renewQueueCount { background: #fff1f0; color: #cf1322; }
     .topnav-inner {
       display: flex;
       align-items: flex-start;
@@ -380,6 +382,7 @@
       text-decoration: none;
     }
     .detail-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .detail-link.is-attention { color: #FF9D00; }
     .row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
     .row-actions .detail-link { min-width: 0; padding-inline: 0; white-space: nowrap; }
     .detail-link:disabled, .detail-link[aria-disabled="true"] { color: #8a929b; cursor: default; text-decoration: none; }
@@ -866,7 +869,7 @@
     #renewQueueQuery, #renewQueueReset { width: 68px; min-width: 68px; padding-inline: 0; }
     .renew-purpose { line-height: 1.6; overflow-wrap: anywhere; }
     /* “我收到的”角标表示可下载数量，不是告警，用主题蓝 */
-    #receivedCount { background: var(--accent); }
+    #receivedCount { background: #e6f0ff; color: #2f6feb; }
     .filter-grid[hidden], .table-region[hidden], .audit-panel[hidden] { display: none; }
     /* 审计日志 */
     #auditQuery, #auditReset { width: 68px; min-width: 68px; padding-inline: 0; }
@@ -1895,7 +1898,7 @@
           `<button class="detail-link" type="button" data-row-action="${action}" data-id="${id}" aria-label="${label}：交付记录 ${id}">${label}</button>`
         ).join('');
         const approvable = approvableRenewals(record).length;
-        const renewButton = approvable ? `<button class="detail-link" type="button" data-row-action="renew-approve" data-id="${id}" aria-label="续期审批：交付记录 ${id}，${approvable} 条待处理">续期审批 (${approvable})</button>` : '';
+        const renewButton = approvable ? `<button class="detail-link is-attention" type="button" data-row-action="renew-approve" data-id="${id}" aria-label="续期审批：交付记录 ${id}，${approvable} 条待处理">续期审批 (${approvable})</button>` : '';
         return `<div class="row-actions"><button class="detail-link" type="button" data-detail-id="${id}" aria-label="查看交付记录 ${id} 的详情">详情</button>${extra}${renewButton}</div>`;
       }
 
@@ -2258,6 +2261,10 @@
         });
         filtered.sort((a, b) => {
           // “待复核”按申请时间排序，其余视图按交付时间。
+          if (state.view === 'sent') {
+            const pendingDelta = Number(approvableRenewals(b).length > 0) - Number(approvableRenewals(a).length > 0);
+            if (pendingDelta) return pendingDelta;
+          }
           const sortTime = (record) => new Date(state.view === 'review' ? (record.review?.appliedAt || record.createdAt) : state.view === 'received' ? (record.receivedAt || record.createdAt) : record.createdAt).getTime();
           const delta = sortTime(a) - sortTime(b);
           return state.sortDirection === 'asc' ? delta : -delta;
