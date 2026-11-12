@@ -584,6 +584,21 @@
       line-height: 1.5714;
       box-shadow: -6px 0 16px rgba(0, 0, 0, 0.08), -3px 0 6px -4px rgba(0, 0, 0, 0.12), -9px 0 28px 8px rgba(0, 0, 0, 0.05);
     }
+    /* 交付详情使用二级界面，保留列表上下文并提供明确返回入口 */
+    #detailDialog {
+      inset: 0;
+      width: 100vw;
+      max-width: none;
+      animation: none;
+      box-shadow: none;
+      z-index: 20;
+    }
+    #detailDialog::backdrop { background: transparent; }
+    #detailDialog .dialog-header { padding: 20px 32px; border-bottom: 1px solid var(--border); }
+    #detailDialog .drawer-close { width: auto; padding: 0 10px; gap: 6px; color: var(--accent-ink); font-size: 14px; }
+    #detailDialog .drawer-close::after { content: "返回列表"; }
+    #detailDialog .drawer-close svg { display: none; }
+    #detailDialog .drawer-body { max-width: 1180px; margin: 0 auto; padding: 28px 32px 48px; }
     /* 管理授权侧拉栏：与交付详情 / 新增交付共用抽屉规范（左侧关闭、分隔标题、描述表格、底部操作栏） */
     #authorizeDialog { overflow: hidden; }
     .authorize-shell { display: flex; flex-direction: column; height: 100%; }
@@ -855,6 +870,11 @@
     }
     .copy-btn:hover { color: #4096ff; background: rgba(0, 0, 0, 0.04); }
     .copy-btn svg { width: 14px; height: 14px; }
+    .download-command-box { position: relative; margin-top: 16px; padding: 18px 104px 18px 18px; border-radius: 8px; background: #20242a; color: #f5f7fa; }
+    .download-command { display: block; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+    .download-command-copy { position: absolute; top: 14px; right: 14px; min-width: 72px; border: 0; border-radius: 6px; background: #1677ff; color: #fff; }
+    .download-command-copy:hover { background: #4096ff; color: #fff; }
+    .download-command-hint { margin: 10px 0 0; color: rgba(0, 0, 0, 0.45); font-size: 13px; line-height: 1.6; }
     .expiry-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; }
     .received-hint { margin: -8px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
     .record-tab-count[hidden] { display: none; }
@@ -3126,6 +3146,13 @@
         };
       }
 
+      function getDownloadCommand(record) {
+        const link = getDownloadLink(record).url.replace(`X-Amz-Expires=${LINK_TTL_SECONDS}`, 'X-Amz-Expires=600');
+        const fileName = artifactFileName(record);
+        const wget = `wget -c -O ${fileName} "${link}"`;
+        return record.type === 'Harbor镜像' ? `${wget}\ndocker load -i ${fileName}` : wget;
+      }
+
       function regenerateDownloadLink(record) {
         const link = getDownloadLink(record) && downloadLinks.get(record.id);
         link.signedAt = new Date();
@@ -3175,6 +3202,10 @@
             </table>
             <button class="drawer-btn" type="button" data-scan-report>${FILE_ICON}<span>查看扫描报告</span></button>
           </section>
+          ${isReceived ? `<section aria-labelledby="detailCommandTitle">
+            <h3 class="desc-divider" id="detailCommandTitle">下载命令</h3>
+            ${recvStatus === '可下载' ? `<div class="download-command-box"><code class="download-command" id="detailDownloadCommand">${escapeHTML(getDownloadCommand(record))}</code><button class="ant-btn download-command-copy" type="button" data-copy-command>复制</button></div><p class="download-command-hint">命令链接 10 分钟内有效（exp=600）；过期后重新打开详情生成。wget -c 支持断点续传。</p>` : `<p class="download-command-hint">当前状态无法生成下载命令，请确认交付仍在有效期内。</p>`}
+          </section>` : ''}
           </section>${isReceived ? '' : renderDownloadSection(record)}${isReceived ? '' : renderReviewSection(record)}${renderRenewalSection(record, isReceived)}`;
           detailContent.insertAdjacentHTML('beforeend', `
           <section aria-labelledby="detailTimelineTitle">
@@ -3241,6 +3272,16 @@
         if (!record) return;
         if (event.target.closest('[data-download]')) {
           downloadRecord(record);
+          return;
+        }
+        if (event.target.closest('[data-copy-command]')) {
+          const command = document.getElementById('detailDownloadCommand')?.textContent || '';
+          try {
+            await navigator.clipboard.writeText(command);
+            showToast('下载命令已复制。');
+          } catch (error) {
+            showToast('复制失败，请手动选中命令复制。');
+          }
           return;
         }
         if (event.target.closest('[data-copy-link]')) {
